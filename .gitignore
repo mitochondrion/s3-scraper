@@ -1,3 +1,8 @@
+# Scraper output files
+diagnostic.out
+files.txt
+sizes.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
