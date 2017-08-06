@@ -5,9 +5,9 @@ import requests
 import time
 import sys
 
-MIN_SIZE = 500000
+MIN_SIZE = 250000
 THROTTLE = 1
-MAX_PAGES = 1500
+MAX_PAGES = 2500
 
 args = sys.argv
 
@@ -26,8 +26,16 @@ queryParams = {
 }
 
 targetFiles = []
-sizes = []
+mp3Sizes = []
+fileTypes = {}
 page = 1
+errorCount = 0
+
+def writeDiagnostic(response, finalStateInfo=''):
+    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{response}\n\n==HEADERS==\n\n{response.headers}\n\n==CONTENT==\n\n{response.content}\n\n==FILE TYPES==\n\n{fileTypes}\n\n=====\n'
+    diagnosticFile = open('./diagnostic.out', 'w')
+    diagnosticFile.write(diagnosticMsg)
+    diagnosticFile.close()
 
 while page <= MAX_PAGES:
     print(f'Fetching page {page}...')
@@ -35,6 +43,7 @@ while page <= MAX_PAGES:
     response = requests.request('GET', initialUrl, params=queryParams)
 
     if response.status_code != 200:
+        errorCount += 1
         print(f'ERROR: Received {response.status_code}\n\n==HEADERS==\n\n{response.headers}\n\n==CONTENT==\n\n{response.content}\n\n=====\n\n')
 
         # Backoff and retry once
@@ -43,8 +52,8 @@ while page <= MAX_PAGES:
         response = requests.request('GET', initialUrl, params=queryParams)
 
         if response.status_code != 200:
-            print(f'FATAL: Received {response.status_code}\n\n==HEADERS==\n\n{response.headers}\n\n==CONTENT==\n\n{response.content}\n\n=====\n\n')
-            print('Failed on retry. Aborting.\n\n')
+            print(f'FATAL: Failed on retry. Received {response.status_code}. Aborting.\n\n')
+            writeDiagnostic(response, 'Failed on retry.')
             break
 
     page += 1
@@ -55,16 +64,21 @@ while page <= MAX_PAGES:
     for content in contentElements:
         sizeText = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Size').text
         size = int(sizeText)
-        sizes.append(size)
+        mp3Sizes.append(size)
         path = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Key')
+        pathText = path.text
+
+        pathTokens = pathText.split('.')
+        if len(pathTokens) > 1:
+            fileType = pathTokens[-1]
+            fileTypes[fileType] = pathText
 
         if size > MIN_SIZE and path is not None:
-            pathText = path.text
             if pathText.endswith('.mp3'):
                 targetFiles.append((size, pathText))
 
     print('Done processing.')
-    print(f'Count: {len(targetFiles)} target files of {len(sizes)} total files.\n')
+    print(f'Count: {len(targetFiles)} target files of {len(mp3Sizes)} total mp3 files.\n')
 
     # Handle paging
 
@@ -79,17 +93,16 @@ while page <= MAX_PAGES:
         continuationToken = continuationTokenElements[0].text
         queryParams['continuation-token'] = continuationToken
     else:
-        diagnosticMsg = f'==FINAL STATE==\n\ncontinuationToken count: {len(continuationTokenElements)}, isTruncated: {isTruncatedText}\n\n==FINAL RESPONS==\n\n{response}\n\n==HEADERS==\n\n{response.headers}\n\n==CONTENT==\n\n{response.content}\n\n==XML==\n\n{etree.tostring(root, encoding="utf8", method="xml")}\n\n=====\n'
-        diagnosticFile = open('./diagnostic.out', 'w')
-        diagnosticFile.write(diagnosticMsg)
-        diagnosticFile.close()
+        diagnosticMsg = f'continuationToken count: {len(continuationTokenElements)}, isTruncated: {isTruncatedText}'
+        # '{etree.tostring(root, encoding="utf8", method="xml")}'
+        writeDiagnostic(response, diagnosticMsg)
         break
 
     # Throttle otherwise AWS will start to return empty results
     time.sleep(THROTTLE)
 
 targetFilesSorted = sorted(targetFiles, key=lambda file: file[0], reverse=True)
-print(f'{targetFilesSorted[0]}, {targetFilesSorted[len(targetFilesSorted)-1]}')
+print(f'{targetFilesSorted[0]}, {targetFilesSorted[-1]}')
 
 sizesData = '\n'.join(
     map(
