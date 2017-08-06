@@ -1,9 +1,9 @@
 #!/usr/local/bin/python3
 
-import xml.etree.ElementTree as etree
-import requests
 import time
 import sys
+import xml.etree.ElementTree as etree
+import requests
 
 MIN_SIZE = 250000
 THROTTLE = 1
@@ -31,8 +31,8 @@ fileTypes = {}
 page = 1
 errorCount = 0
 
-def writeDiagnostic(response, finalStateInfo=''):
-    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{response}\n\n==HEADERS==\n\n{response.headers}\n\n==CONTENT==\n\n{response.content}\n\n==FILE TYPES==\n\n{fileTypes}\n\n=====\n'
+def writeDiagnostic(lastResponse, finalStateInfo=''):
+    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{lastResponse}\n\n==HEADERS==\n\n{lastResponse.headers}\n\n==CONTENT==\n\n{lastResponse.content}\n\n==FILE TYPES==\n\n{fileTypes}\n\n=====\n'
     diagnosticFile = open('./diagnostic.out', 'w')
     diagnosticFile.write(diagnosticMsg)
     diagnosticFile.close()
@@ -83,7 +83,7 @@ while page <= MAX_PAGES:
     # Handle paging
 
     isTruncatedText = ''
-    isTruncatedElements =  root.findall('{http://s3.amazonaws.com/doc/2006-03-01/}IsTruncated')
+    isTruncatedElements = root.findall('{http://s3.amazonaws.com/doc/2006-03-01/}IsTruncated')
     if isTruncatedElements:
         isTruncatedText = isTruncatedElements[0].text
 
@@ -104,12 +104,7 @@ while page <= MAX_PAGES:
 targetFilesSorted = sorted(targetFiles, key=lambda file: file[0], reverse=True)
 print(f'{targetFilesSorted[0]}, {targetFilesSorted[-1]}')
 
-sizesData = '\n'.join(
-    map(
-        lambda size: str(size),
-        sizes
-    )
-)
+sizesData = '\n'.join(map(str, mp3Sizes))
 sizesFile = open('./sizes.txt', 'w')
 sizesFile.write(sizesData)
 sizesFile.close()
@@ -121,5 +116,5 @@ filesData = '\n'.join(
     )
 )
 filesFile = open('./files.txt', 'w')
-filesFile.write(filesData) 
+filesFile.write(filesData)
 filesFile.close()
