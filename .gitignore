@@ -2,6 +2,10 @@
 diagnostic.out
 files.txt
 sizes.txt
+mp3Files.txt
+mp3Sizes.txt
+otherFiles.txt
+pdfFiles.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
