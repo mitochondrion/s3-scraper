@@ -7,7 +7,7 @@ import requests
 
 MIN_SIZE = 250000
 THROTTLE = 1
-MAX_PAGES = 2500
+MAX_PAGES = 5000
 
 args = sys.argv
 
@@ -25,9 +25,12 @@ queryParams = {
     'max-keys': '1000'
 }
 
-targetFiles = []
+otherFiles = []
+mp3Files = []
+pdfFiles = []
 mp3Sizes = []
 fileTypes = {}
+fileCount = 0
 page = 1
 errorCount = 0
 
@@ -62,26 +65,29 @@ while page <= MAX_PAGES:
     contentElements = root.findall('{http://s3.amazonaws.com/doc/2006-03-01/}Contents')
 
     for content in contentElements:
+        fileCount += 1
         sizeText = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Size').text
         size = int(sizeText)
-        mp3Sizes.append(size)
-        path = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Key')
-        pathText = path.text
+        pathText = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Key').text
 
         pathTokens = pathText.split('.')
         if len(pathTokens) > 1:
             fileType = pathTokens[-1]
             fileTypes[fileType] = pathText
 
-        if size > MIN_SIZE and path is not None:
-            if pathText.endswith('.mp3'):
-                targetFiles.append((size, pathText))
+        if pathText.endswith(('.mp3', '.mp3.1', '.mp3.2', '.mp3.3')):
+            mp3Sizes.append(size)
+            if size > MIN_SIZE:
+                mp3Files.append((size, pathText))
+        elif pathText.endswith('.pdf'):
+            pdfFiles.append((size, pathText))
+        elif size > MIN_SIZE and pathText.endswith(('.mp4')):
+            otherFiles.append((size, pathText))
 
     print('Done processing.')
-    print(f'Count: {len(targetFiles)} target files of {len(mp3Sizes)} total mp3 files.\n')
+    print(f'Count: {len(mp3Files)} target files of {fileCount} total mp3 files.\n')
 
     # Handle paging
-
     isTruncatedText = ''
     isTruncatedElements = root.findall('{http://s3.amazonaws.com/doc/2006-03-01/}IsTruncated')
     if isTruncatedElements:
@@ -94,27 +100,26 @@ while page <= MAX_PAGES:
         queryParams['continuation-token'] = continuationToken
     else:
         diagnosticMsg = f'continuationToken count: {len(continuationTokenElements)}, isTruncated: {isTruncatedText}'
-        # '{etree.tostring(root, encoding="utf8", method="xml")}'
         writeDiagnostic(response, diagnosticMsg)
         break
 
     # Throttle otherwise AWS will start to return empty results
     time.sleep(THROTTLE)
 
-targetFilesSorted = sorted(targetFiles, key=lambda file: file[0], reverse=True)
-print(f'{targetFilesSorted[0]}, {targetFilesSorted[-1]}')
+mp3FilesSorted = sorted(mp3Files, key=lambda file: file[0], reverse=True)
+pdfFilesSorted = sorted(pdfFiles, key=lambda file: file[0], reverse=True)
+otherFilesSorted = sorted(otherFiles, key=lambda file: file[0], reverse=True)
+print(f'MP3: {mp3FilesSorted[0]}, {mp3FilesSorted[-1]}')
+print(f'PDF: {pdfFilesSorted[0]}, {pdfFilesSorted[-1]}')
+print(f'OTHER: {otherFilesSorted[0]}, {otherFilesSorted[-1]}')
 
-sizesData = '\n'.join(map(str, mp3Sizes))
-sizesFile = open('./sizes.txt', 'w')
-sizesFile.write(sizesData)
-sizesFile.close()
+def writeFile(fileName, dataList, dataTransform):
+    data = '\n'.join(map(dataTransform, dataList))
+    outFile = open(fileName, 'w')
+    outFile.write(data)
+    outFile.close()
 
-filesData = '\n'.join(
-    map(
-        lambda file: f'{file[0]},{file[1]}\n',
-        targetFilesSorted
-    )
-)
-filesFile = open('./files.txt', 'w')
-filesFile.write(filesData)
-filesFile.close()
+writeFile('./mp3Sizes.txt', mp3Sizes, str)
+writeFile('./mp3Files.txt', mp3FilesSorted, lambda file: f'{file[0]},{file[1]}\n')
+writeFile('./pdfFiles.txt', pdfFilesSorted, lambda file: f'{file[0]},{file[1]}\n')
+writeFile('./otherFiles.txt', otherFilesSorted, lambda file: f'{file[0]},{file[1]}\n')
