@@ -120,6 +120,6 @@ def writeFile(fileName, dataList, dataTransform):
     outFile.close()
 
 writeFile('./mp3Sizes.txt', mp3Sizes, str)
-writeFile('./mp3Files.txt', mp3FilesSorted, lambda file: f'{file[0]},{file[1]}\n')
-writeFile('./pdfFiles.txt', pdfFilesSorted, lambda file: f'{file[0]},{file[1]}\n')
-writeFile('./otherFiles.txt', otherFilesSorted, lambda file: f'{file[0]},{file[1]}\n')
+writeFile('./mp3Files.txt', mp3FilesSorted, lambda file: f'{file[0]},{file[1]}')
+writeFile('./pdfFiles.txt', pdfFilesSorted, lambda file: f'{file[0]},{file[1]}')
+writeFile('./otherFiles.txt', otherFilesSorted, lambda file: f'{file[0]},{file[1]}')
