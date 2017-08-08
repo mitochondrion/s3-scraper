@@ -2,12 +2,13 @@
 
 import time
 import sys
+from collections import defaultdict
 import xml.etree.ElementTree as etree
 import requests
 
 MIN_SIZE = 250000
-THROTTLE = 1
-MAX_PAGES = 5000
+THROTTLE = 0.5
+MAX_PAGES = 10000
 
 args = sys.argv
 
@@ -25,17 +26,13 @@ queryParams = {
     'max-keys': '1000'
 }
 
-otherFiles = []
-mp3Files = []
-pdfFiles = []
-mp3Sizes = []
-fileTypes = {}
-fileCount = 0
+files = []
+fileTypeCounts = defaultdict(int)
 page = 1
 errorCount = 0
 
 def writeDiagnostic(lastResponse, finalStateInfo=''):
-    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{lastResponse}\n\n==HEADERS==\n\n{lastResponse.headers}\n\n==CONTENT==\n\n{lastResponse.content}\n\n==FILE TYPES==\n\n{fileTypes}\n\n=====\n'
+    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{lastResponse}\n\n==HEADERS==\n\n{lastResponse.headers}\n\n==CONTENT==\n\n{lastResponse.content}\n\n==FILE TYPES==\n\n{fileTypeCounts}\n\n=====\n'
     diagnosticFile = open('./diagnostic.out', 'w')
     diagnosticFile.write(diagnosticMsg)
     diagnosticFile.close()
@@ -65,27 +62,28 @@ while page <= MAX_PAGES:
     contentElements = root.findall('{http://s3.amazonaws.com/doc/2006-03-01/}Contents')
 
     for content in contentElements:
-        fileCount += 1
         sizeText = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Size').text
         size = int(sizeText)
         pathText = content.find('{http://s3.amazonaws.com/doc/2006-03-01/}Key').text
 
+        fileType = 'NONE'
         pathTokens = pathText.split('.')
         if len(pathTokens) > 1:
             fileType = pathTokens[-1]
-            fileTypes[fileType] = pathText
 
-        if pathText.endswith(('.mp3', '.mp3.1', '.mp3.2', '.mp3.3')):
-            mp3Sizes.append(size)
-            if size > MIN_SIZE:
-                mp3Files.append((size, pathText))
-        elif pathText.endswith('.pdf'):
-            pdfFiles.append((size, pathText))
-        elif size > MIN_SIZE and pathText.endswith(('.mp4')):
-            otherFiles.append((size, pathText))
+            if fileType in ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'old'] and len(pathTokens) > 2:
+                fileType = pathTokens[-2]
 
-    print('Done processing.')
-    print(f'Count: {len(mp3Files)} target files of {fileCount} total mp3 files.\n')
+            fileTypeCounts[fileType] += 1
+
+            if fileType == 'mp3' and size > MIN_SIZE:
+                fileTypeCounts['mp3+'] += 1
+
+        files.append((size, fileType, pathText))
+
+    print('Done processing page.')
+    fileTypeCountsMsg = ' | '.join([f'{key}: {fileTypeCounts[key]}' for key in fileTypeCounts])
+    print(f'File count: {len(files)} ({fileTypeCountsMsg})')
 
     # Handle paging
     isTruncatedText = ''
@@ -106,12 +104,8 @@ while page <= MAX_PAGES:
     # Throttle otherwise AWS will start to return empty results
     time.sleep(THROTTLE)
 
-mp3FilesSorted = sorted(mp3Files, key=lambda file: file[0], reverse=True)
-pdfFilesSorted = sorted(pdfFiles, key=lambda file: file[0], reverse=True)
-otherFilesSorted = sorted(otherFiles, key=lambda file: file[0], reverse=True)
-print(f'MP3: {mp3FilesSorted[0]}, {mp3FilesSorted[-1]}')
-print(f'PDF: {pdfFilesSorted[0]}, {pdfFilesSorted[-1]}')
-print(f'OTHER: {otherFilesSorted[0]}, {otherFilesSorted[-1]}')
+filesSorted = sorted(files, key=lambda file: file[0], reverse=True)
+print(f'Largest file: {filesSorted[0]}')
 
 def writeFile(fileName, dataList, dataTransform):
     data = '\n'.join(map(dataTransform, dataList))
@@ -119,7 +113,5 @@ def writeFile(fileName, dataList, dataTransform):
     outFile.write(data)
     outFile.close()
 
-writeFile('./mp3Sizes.txt', mp3Sizes, str)
-writeFile('./mp3Files.txt', mp3FilesSorted, lambda file: f'{file[0]},{file[1]}')
-writeFile('./pdfFiles.txt', pdfFilesSorted, lambda file: f'{file[0]},{file[1]}')
-writeFile('./otherFiles.txt', otherFilesSorted, lambda file: f'{file[0]},{file[1]}')
+writeFile('./files.txt', filesSorted, str)
+writeFile('./files.txt', filesSorted, lambda file: f'{file[0]},{file[1]},{file[2]}')
