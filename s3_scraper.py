@@ -8,7 +8,7 @@ import requests
 
 MIN_SIZE = 250000
 THROTTLE = 0.5
-MAX_PAGES = 10000
+MAX_PAGES = 15000
 
 args = sys.argv
 
@@ -32,7 +32,8 @@ page = 1
 errorCount = 0
 
 def writeDiagnostic(lastResponse, finalStateInfo=''):
-    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{lastResponse}\n\n==HEADERS==\n\n{lastResponse.headers}\n\n==CONTENT==\n\n{lastResponse.content}\n\n==FILE TYPES==\n\n{fileTypeCounts}\n\n=====\n'
+    fileTypeCountsMsg = ' | '.join([f'{key}: {fileTypeCounts[key]}' for key in fileTypeCounts])
+    diagnosticMsg = f'Pages: {page}, Errors: {errorCount}\n\n==FINAL STATE==\n\n{finalStateInfo}\n\n==FINAL RESPONSE==\n\n{lastResponse}\n\n==HEADERS==\n\n{lastResponse.headers}\n\n==CONTENT==\n\n{lastResponse.content}\n\n==FILE TYPES==\n\nTotal: {len(files)} ({fileTypeCountsMsg})\n\n=====\n'
     diagnosticFile = open('./diagnostic.out', 'w')
     diagnosticFile.write(diagnosticMsg)
     diagnosticFile.close()
