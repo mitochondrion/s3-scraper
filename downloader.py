@@ -11,19 +11,19 @@ THROTTLE = 0.5
 
 args = sys.argv
 
-if len(args) < 3:
-    print('Usage: downloader.py [S3 bucket] [download paths file]')
+if len(args) < 5:
+    print('Usage: downloader.py [S3 bucket] [download paths file] [start index] [end index]')
     exit()
 else:
     bucket = args[1]
     pathsFile = args[2]
+    startIndex = int(args[3])
+    untilIndex = int(args[4])
 
 baseUrl = f'https://s3.amazonaws.com/{bucket}/'
 destinationPath = '/Users/steakknife/Documents/cpod/'
 errors = []
 outFile = open("/tmp/downloader.out", 'w')
-startIndex = 0
-untilIndex = 99999
 downloadCount = startIndex
 
 paths = [line.rstrip('\n') for line in open(pathsFile)][startIndex:untilIndex]
@@ -43,12 +43,23 @@ for path in paths:
 
     id3 = mutagen.File(fileName)
 
+    # HEADERS ONLY
+    # try:
+	# outFile.write(str(downloadCount) + '\nPATH: ' + path + '\nKEYS: ' + str(id3.keys()) + '\n')
+	# id3.pop('APIC:', None)
+	# id3.pop('APIC', None)
+	# id3.pop('APIC:', None)
+	# outFile.write(str(id3) + '\n---\n')
+        # destinationFileName = path.split('/')[-1]
+    # except:
+	# outFile.write(str(downloadCount) + '\n---\n')
+
     try:
         trackNumber = id3.tags['TRCK'].text[0]
         trackAlbum = id3.tags['TALB'].text[0].replace('/', '|')
         trackTitle = id3.tags['TIT2'].text[0].replace('/', '|')
     except Exception as exception:
-        errorMsg = 'FAIL(id3) ' + str(downloadCount) + ': ' + str(exception) + '\nFILE: ' + fileName + '\n\n'
+        errorMsg = 'FAIL(id3) ' + str(downloadCount) + ': ' + str(exception) + '\nPATH: ' + path + '\nFILE: ' + fileName + '\n\n'
         print(errorMsg)
         outFile.write(errorMsg)
         continue
@@ -63,7 +74,7 @@ for path in paths:
         outFile.write(errorMsg)
         break
 
-    time.sleep(3)
+    time.sleep(1.5)
 
 outFile.close
 
