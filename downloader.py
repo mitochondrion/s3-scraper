@@ -55,8 +55,8 @@ for path in paths:
 	# outFile.write(str(downloadCount) + '\n---\n')
 
     try:
-        trackNumber = id3.tags['TRCK'].text[0]
-        trackAlbum = id3.tags['TALB'].text[0].replace('/', '|')
+        # trackNumber = id3.tags['TRCK'].text[0]
+        # trackAlbum = id3.tags['TALB'].text[0].replace('/', '|')
         trackTitle = id3.tags['TIT2'].text[0].replace('/', '|')
     except Exception as exception:
         errorMsg = 'FAIL(id3) ' + str(downloadCount) + ': ' + str(exception) + '\nPATH: ' + path + '\nFILE: ' + fileName + '\n\n'
@@ -65,7 +65,8 @@ for path in paths:
         continue
 
     try:
-        destinationFileName = trackNumber + ' - ' + trackTitle + ' - ' + trackAlbum + '.mp3'
+        # destinationFileName = trackNumber + ' - ' + trackTitle + ' - ' + trackAlbum + '.mp3'
+        destinationFileName = trackTitle + '.mp3'
         destination = destinationPath + destinationFileName
         os.rename(fileName, destination)
     except Exception as exception:
